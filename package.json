@@ -1,0 +1,15 @@
+{
+  "name": "nyayasetu",
+  "private": true,
+  "engines": { "node": ">=20.9.0" },
+  "workspaces": ["apps/web"],
+  "scripts": {
+    "dev": "npm run dev --workspace @nyayasetu/web",
+    "build": "npm run build --workspace @nyayasetu/web",
+    "typecheck": "npm run typecheck --workspace @nyayasetu/web",
+    "lint": "npm run lint --workspace @nyayasetu/web",
+    "db:push": "supabase db push",
+    "db:test": "supabase test db"
+  },
+  "devDependencies": { "supabase": "^2.122.0" }
+}

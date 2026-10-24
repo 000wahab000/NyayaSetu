@@ -1,0 +1,47 @@
+import { NextResponse, type NextRequest } from "next/server";
+import { createServerClient } from "@supabase/ssr";
+import { getPublicEnv } from "@/lib/supabase/env";
+import { hasRequiredMfa, ROLES, type Role } from "@/lib/auth/roles";
+
+const ROLE_PREFIX: Record<string, Role[]> = {
+  "/student": ["student"], "/faculty": ["faculty"], "/college": ["college_management"],
+  "/aicte": ["pgrc_triage_officer", "bureau_officer", "regional_officer", "bureau_head", "competent_authority", "ombudsperson", "auditor", "system_admin"],
+};
+const OPEN = ["/auth", "/api/auth", "/_next", "/favicon.ico"];
+
+export async function proxy(request: NextRequest) {
+  const path = request.nextUrl.pathname;
+  if (OPEN.some((prefix) => path === prefix || path.startsWith(`${prefix}/`))) return NextResponse.next();
+  const env = getPublicEnv();
+  let response = NextResponse.next({ request });
+  const supabase = createServerClient(env.NEXT_PUBLIC_SUPABASE_URL, env.NEXT_PUBLIC_SUPABASE_ANON_KEY, {
+    cookies: {
+      getAll: () => request.cookies.getAll(),
+      setAll: (updates) => { updates.forEach(({ name, value }) => request.cookies.set(name, value)); response = NextResponse.next({ request }); updates.forEach(({ name, value, options }) => response.cookies.set(name, value, options)); },
+    },
+  });
+  const { data: { user }, error } = await supabase.auth.getUser();
+  const isApi = path.startsWith("/api/");
+  const reject = (status: number, destination?: string) => isApi
+    ? NextResponse.json({ error: status === 401 ? "Unauthenticated" : "Forbidden" }, { status })
+    : destination ? NextResponse.redirect(new URL(destination, request.url))
+      : new NextResponse(status === 401 ? "Unauthenticated" : "Forbidden", { status });
+  if (error || !user) return reject(401);
+  const sessionId = request.cookies.get("nyaya_session")?.value;
+  if (!sessionId) return reject(401);
+  const { data: activeSession, error: sessionError } = await supabase.from("user_sessions").select("id").eq("auth_session_id", sessionId).eq("user_id", user.id).is("revoked_at", null).maybeSingle();
+  if (sessionError || !activeSession) return reject(401);
+  const { data: assignments, error: roleError } = await supabase.from("role_assignments").select("role,bureau,institution_id,region").eq("user_id", user.id).is("revoked_at", null);
+  if (roleError || !assignments?.length) return reject(403, "/auth/login?error=account_not_provisioned");
+  const assignment = assignments.find((item) => ROLES.includes(item.role as Role));
+  if (!assignment) return reject(403);
+  const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+  const role = assignment.role as Role;
+  if (!hasRequiredMfa(role, aal?.currentLevel)) return reject(403, "/auth/totp");
+  const matchedPrefix = Object.keys(ROLE_PREFIX).find((prefix) => path === prefix || path.startsWith(`${prefix}/`));
+  if (matchedPrefix && !ROLE_PREFIX[matchedPrefix].includes(role)) return reject(403);
+  if (matchedPrefix) { response.headers.set("Cache-Control", "private, no-store"); return response; }
+  return response;
+}
+
+export const config = { matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"] };

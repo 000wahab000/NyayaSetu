@@ -3,4 +3,6 @@
 .env*.local
 node_modules/
 .next/
+supabase/.temp/
+apps/web/.next/
 
