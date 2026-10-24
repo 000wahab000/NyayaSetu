@@ -28,26 +28,33 @@ export async function GET(req: NextRequest) {
         .eq("status", "out_of_scope"),
     ]);
 
-  // Bureau-wise workload
-  const { data: bureauData } = await supabase
-    .from("complaints")
-    .select("assigned_bureau")
-    .not("assigned_bureau", "is", null)
-    .not("status", "in", '("closed","appeal_decided","out_of_scope")');
+  // Bureau-wise workload + open overlap alerts count (Phase 3)
+  const [bureauRes, alertsRes] = await Promise.all([
+    supabase
+      .from("complaints")
+      .select("assigned_bureau")
+      .not("assigned_bureau", "is", null)
+      .not("status", "in", '("closed","appeal_decided","out_of_scope")'),
+    supabase
+      .from("overlap_alerts")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "open"),
+  ]);
 
   const bureauWorkload: Record<string, number> = {};
-  bureauData?.forEach(({ assigned_bureau }) => {
+  bureauRes.data?.forEach(({ assigned_bureau }) => {
     if (assigned_bureau) bureauWorkload[assigned_bureau] = (bureauWorkload[assigned_bureau] ?? 0) + 1;
   });
 
   return NextResponse.json({
-    total:         total.count ?? 0,
-    pending:       pending.count ?? 0,
-    underProcess:  underProcess.count ?? 0,
-    disposed:      disposed.count ?? 0,
-    transferred:   transferred.count ?? 0,
+    total:          total.count ?? 0,
+    pending:        pending.count ?? 0,
+    underProcess:   underProcess.count ?? 0,
+    disposed:       disposed.count ?? 0,
+    transferred:    transferred.count ?? 0,
     beyondTimeline: beyondTimeline.count ?? 0,
-    outOfScope:    outOfScope.count ?? 0,
+    outOfScope:     outOfScope.count ?? 0,
+    openAlerts:     alertsRes.count ?? 0,
     bureauWorkload,
   });
 }

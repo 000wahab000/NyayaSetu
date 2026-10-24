@@ -145,6 +145,16 @@ export async function POST(req: NextRequest) {
     access_scope: "redacted_summary",
   });
 
+  // Fire-and-forget overlap detection — does not block the response
+  fetch(`${req.nextUrl.origin}/api/overlap/detect`, {
+    method: "POST",
+    headers: {
+      "x-user-role":   role,
+      "x-user-bureau": req.headers.get("x-user-bureau") ?? "",
+      "Cookie":        req.headers.get("cookie") ?? "",
+    },
+  }).catch(() => { /* best-effort */ });
+
   return NextResponse.json({ complaint }, { status: 201 });
 }
 

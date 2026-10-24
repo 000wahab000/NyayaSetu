@@ -93,6 +93,32 @@ export default async function CaseDetailPage({ params }: { params: Promise<{ id:
           </div>
         </div>
 
+        {/* Overlap panel — shown when coordination_status is not no_overlap */}
+        {c.coordination_status !== "no_overlap" && (
+          <div className={`rounded-lg border px-4 py-3 flex items-center justify-between text-sm
+            ${c.coordination_status === "possible_overlap" ? "border-red-200 bg-red-50" : ""}
+            ${c.coordination_status === "linked"           ? "border-blue-200 bg-blue-50" : ""}
+            ${c.coordination_status === "dismissed"        ? "border-slate-200 bg-slate-50" : ""}
+          `}>
+            <span className={
+              c.coordination_status === "possible_overlap" ? "text-red-700 font-medium" :
+              c.coordination_status === "linked"           ? "text-blue-700 font-medium" :
+              "text-slate-500"
+            }>
+              {c.coordination_status === "possible_overlap" && "⚠ Potential overlap detected — this institution has active cases in multiple Bureaus"}
+              {c.coordination_status === "linked"           && "🔗 This case has been linked to one or more related cases by an officer"}
+              {c.coordination_status === "dismissed"        && "✓ Overlap alert was reviewed and dismissed"}
+            </span>
+            {c.coordination_status !== "dismissed" && (
+              <Link href="/aicte/alerts"
+                className="ml-4 text-xs font-medium underline whitespace-nowrap
+                  text-red-600 hover:text-red-800">
+                View Alert Centre →
+              </Link>
+            )}
+          </div>
+        )}
+
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Left: Case details */}
           <div className="lg:col-span-2 space-y-4">

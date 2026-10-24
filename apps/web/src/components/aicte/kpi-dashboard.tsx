@@ -7,7 +7,7 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 
 type KpiData = {
   total: number; pending: number; underProcess: number;
   disposed: number; transferred: number; beyondTimeline: number;
-  outOfScope: number; bureauWorkload: Record<string, number>;
+  outOfScope: number; openAlerts: number; bureauWorkload: Record<string, number>;
 };
 
 const TILES = [
