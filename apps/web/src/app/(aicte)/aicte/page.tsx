@@ -60,6 +60,18 @@ export default async function AicteHome() {
           </div>
           <div className="flex gap-2 items-center">
             <NotificationBell />
+            {["system_admin", "auditor"].includes(session.role) && (
+              <Link href="/aicte/admin/roles"
+                className="border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-sm font-medium px-4 py-2 rounded-lg transition-colors">
+                Roles
+              </Link>
+            )}
+            {session.role === "system_admin" && (
+              <Link href="/aicte/admin/deadline-rules"
+                className="border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-sm font-medium px-4 py-2 rounded-lg transition-colors">
+                Deadline rules
+              </Link>
+            )}
             <Link href="/aicte/reports"
               className="border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-sm font-medium px-4 py-2 rounded-lg transition-colors">
               Reports

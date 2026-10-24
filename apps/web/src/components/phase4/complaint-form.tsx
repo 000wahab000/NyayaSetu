@@ -1,12 +1,17 @@
 "use client";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { get, set, del } from "idb-keyval";
+import { IntegrationBadge } from "@/components/demo/integration-badge";
 type Institution = { id: string; name: string; aicte_permanent_id: string };
 type SpeechRec = { lang: string; interimResults: boolean; onresult: ((e: { results: { 0: { transcript: string } }[] }) => void) | null; onerror: (() => void) | null; onend: (() => void) | null; start: () => void; stop: () => void };
 type Draft = { institution: string; q: string; category: string; description: string; language: string; confidential: boolean; management: boolean; urgent: boolean; bureau: string };
 const CATEGORIES = ["financial", "ragging", "academic", "infrastructure", "other"];
+function subscribeOnline(onChange: () => void) {
+  window.addEventListener("online", onChange); window.addEventListener("offline", onChange);
+  return () => { window.removeEventListener("online", onChange); window.removeEventListener("offline", onChange); };
+}
 
 export function ComplaintForm({ institutions, intake = false }: { institutions: Institution[]; intake?: boolean }) {
   const router = useRouter(), draftKey = `nyayasetu-complaint-draft-${intake ? "intake" : "student"}`;
@@ -14,8 +19,8 @@ export function ComplaintForm({ institutions, intake = false }: { institutions: 
   const [description, setDescription] = useState(""), [language, setLanguage] = useState("en"), [confidential, setConfidential] = useState(false), [management, setManagement] = useState(false);
   const [urgent, setUrgent] = useState(false), [bureau, setBureau] = useState(""), [error, setError] = useState(""), [busy, setBusy] = useState(false);
   const [duplicate, setDuplicate] = useState(""), [ready, setReady] = useState(false);
-  const [online, setOnline] = useState(true), [draftReady, setDraftReady] = useState(false);
-  const [listening, setListening] = useState(false), [voiceNote, setVoiceNote] = useState(""), recRef = useRef<SpeechRec | null>(null);
+  const online = useSyncExternalStore(subscribeOnline, () => navigator.onLine, () => true), [draftReady, setDraftReady] = useState(false);
+  const [listening, setListening] = useState(false), [voiceNote, setVoiceNote] = useState(""), [simulated, setSimulated] = useState(false), recRef = useRef<SpeechRec | null>(null);
   const t = useTranslations("complaint"), tc = useTranslations("common");
   function appendText(text: string) { setDescription(d => (d ? `${d.trimEnd()} ` : "") + text); setDuplicate(""); }
   // Browser speech recognition when available; otherwise the simulated Bhashini endpoint (no audio is sent).
@@ -34,7 +39,7 @@ export function ComplaintForm({ institutions, intake = false }: { institutions: 
       return;
     }
     setVoiceNote(t("speakUnsupported"));
-    fetch("/api/voice/transcribe", { method: "POST" }).then(r => r.json()).then(d => { if (d.transcript) { appendText(d.transcript); setVoiceNote(d.provider ?? tc("simulated")); } else setVoiceNote(t("speakFailed")); }).catch(() => setVoiceNote(t("speakFailed")));
+    fetch("/api/voice/transcribe", { method: "POST" }).then(r => r.json()).then(d => { if (d.transcript) { appendText(d.transcript); setSimulated(true); setVoiceNote(d.provider ?? tc("simulated")); } else setVoiceNote(t("speakFailed")); }).catch(() => setVoiceNote(t("speakFailed")));
   }
   useEffect(() => {
     let alive = true;
@@ -47,10 +52,9 @@ export function ComplaintForm({ institutions, intake = false }: { institutions: 
   }, [draftKey]);
   useEffect(() => { if (ready) set(draftKey, { institution, q, category, description, language, confidential, management, urgent, bureau } satisfies Draft).catch(() => {}); }, [ready, draftKey, institution, q, category, description, language, confidential, management, urgent, bureau]);
   useEffect(() => {
-    const goOnline = () => { setOnline(true); setDraftReady(true); }, goOffline = () => setOnline(false);
-    setOnline(navigator.onLine);
-    window.addEventListener("online", goOnline); window.addEventListener("offline", goOffline);
-    return () => { window.removeEventListener("online", goOnline); window.removeEventListener("offline", goOffline); };
+    const goOnline = () => setDraftReady(true);
+    window.addEventListener("online", goOnline);
+    return () => window.removeEventListener("online", goOnline);
   }, []);
   const filtered = useMemo(() => institutions.filter(i => `${i.name} ${i.aicte_permanent_id}`.toLowerCase().includes(q.toLowerCase())).slice(0, 8), [institutions, q]);
   async function checkDuplicates() {
@@ -83,7 +87,7 @@ export function ComplaintForm({ institutions, intake = false }: { institutions: 
     <label>{t("institution")} <input value={q} onChange={e => { setQ(e.target.value); setInstitution(""); setDuplicate(""); }} placeholder="Search name or AICTE ID" required />{q && !institution && <div className="p4-options">{filtered.map(i => <button type="button" key={i.id} onClick={() => { setInstitution(i.id); setQ(`${i.name} · ${i.aicte_permanent_id}`); }}>{i.name} · {i.aicte_permanent_id}</button>)}</div>}</label>
     <label>{t("category")} <select value={category} onChange={e => setCategory(e.target.value)}>{CATEGORIES.map(x => <option key={x}>{x}</option>)}</select></label>
     <label>{t("description")} <textarea value={description} onChange={e => { setDescription(e.target.value); setDuplicate(""); }} minLength={10} maxLength={10000} rows={7} required placeholder="Describe the issue in at least two sentences."/><small>{description.length}/10,000 characters {description.trim().length > 0 && description.trim().length < 50 && <span className="p4-warning"> · Please add more detail (under 50 characters).</span>}</small></label>
-    <div><button type="button" className="p4-linkbutton" onClick={speak} aria-pressed={listening}>{listening ? t("speakStop") : t("speak")}</button>{voiceNote && <small role="status"> {voiceNote}</small>}</div>
+    <div><button type="button" className="p4-linkbutton" onClick={speak} aria-pressed={listening}>{listening ? t("speakStop") : t("speak")}</button>{simulated && <IntegrationBadge kind="simulated" label="Simulated: Bhashini" />}{voiceNote && <small role="status"> {voiceNote}</small>}</div>
     {!intake && <><button type="button" className="p4-linkbutton" disabled={busy} onClick={checkDuplicates}>{busy ? "Checking…" : "Check for similar complaints"}</button>{duplicate && <p className="p4-banner" role="status">{duplicate}</p>}</>}
     {!intake && <label>{t("language")} <select value={language} onChange={e => setLanguage(e.target.value)}><option value="en">English</option><option value="hi">Hindi</option><option value="other">Other</option></select></label>}
     <label className="p4-check"><input type="checkbox" checked={confidential} onChange={e => setConfidential(e.target.checked)}/> {t("confidential")} <small>Only authorized AICTE officials will see confidential case details.</small></label>

@@ -21,7 +21,7 @@ export async function POST(req:NextRequest){
  const now=new Date().toISOString();
  const [eventResult,participantResult]=await Promise.all([admin.from("case_events").insert({complaint_id:complaint.id,event_type:"case_submitted",actor_id:session.userId,actor_role:session.role,new_state:{status:"submitted"},visibility:"complainant",event_at:now}),admin.from("participants").insert({complaint_id:complaint.id,user_id:session.userId,role:"complainant",access_scope:"redacted_summary"})]);
  if(eventResult.error||participantResult.error){await admin.from("complaints").delete().eq("id",complaint.id);return NextResponse.json({error:"Case was not fully recorded. Please retry."},{status:500})}
- await auditLog({actor_id:session.userId,action:"complaint.created",resource_type:"complaint",resource_id:complaint.id,new_value:{case_id:complaint.case_id,category:complaint.category}}).catch(()=>{});
+ try{await auditLog({actor_id:session.userId,action:"complaint.created",resource_type:"complaint",resource_id:complaint.id,new_value:{case_id:complaint.case_id,category:complaint.category}})}catch{return NextResponse.json({error:"Case was not recorded in the audit trail. Please retry."},{status:500})}
  embed(description).then(vector=>admin.from("complaints").update({description_embedding:JSON.stringify(vector)}).eq("id",complaint.id)).then(({error:saveError})=>{if(saveError)console.error("[overlap] could not store embedding:",saveError.message)}).catch(err=>console.error("[overlap] embedding failed:",err));
  if(session.role==="pgrc_triage_officer")fetch(`${req.nextUrl.origin}/api/overlap/detect`,{method:"POST",headers:{cookie:req.headers.get("cookie")??"","x-user-role":session.role}}).catch(()=>{});
  return NextResponse.json({complaint},{status:201});

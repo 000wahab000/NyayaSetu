@@ -5,13 +5,15 @@ type Db = ReturnType<typeof createAdminClient>;
 export type RosterVerdict = "verified" | "needs_review" | "unable_to_verify";
 
 /** Matches one enrollment number against the institution's ACTIVE roster and claims the row for the user. */
-export async function matchRoster(db: Db, input: { institutionId: string; userId: string; enrollmentNo: string; programme?: string | null }): Promise<{ verdict: RosterVerdict; rowId: string | null }> {
+/** Alumni are not on the current roster, so a missing match goes to AICTE manual review (plan §3.3 step 5). Current students stay unable_to_verify. */
+export async function matchRoster(db: Db, input: { institutionId: string; userId: string; enrollmentNo: string; programme?: string | null; alumnus?: boolean }): Promise<{ verdict: RosterVerdict; rowId: string | null }> {
+  const noMatch: RosterVerdict = input.alumnus ? "needs_review" : "unable_to_verify";
   const { data: version } = await db.from("roster_versions").select("id").eq("institution_id", input.institutionId).eq("is_active", true).maybeSingle();
-  if (!version) return { verdict: "unable_to_verify", rowId: null };
+  if (!version) return { verdict: noMatch, rowId: null };
   const { data: row, error } = await db.from("roster_rows").select("id,programme,claimed_by").eq("version_id", version.id).eq("enrollment_no", input.enrollmentNo).maybeSingle();
   if (error) throw new Error(error.message);
-  if (!row) return { verdict: "unable_to_verify", rowId: null };
-  if (input.programme && row.programme && row.programme.trim().toLowerCase() !== input.programme.trim().toLowerCase()) return { verdict: "unable_to_verify", rowId: null };
+  if (!row) return { verdict: noMatch, rowId: null };
+  if (input.programme && row.programme && row.programme.trim().toLowerCase() !== input.programme.trim().toLowerCase()) return { verdict: noMatch, rowId: null };
   if (row.claimed_by === input.userId) return { verdict: "verified", rowId: row.id };
   if (row.claimed_by) return { verdict: "needs_review", rowId: row.id };
   const { data: claimed, error: claimError } = await db.from("roster_rows").update({ claimed_by: input.userId, is_claimed: true }).eq("id", row.id).is("claimed_by", null).select("id").maybeSingle();

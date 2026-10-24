@@ -6,7 +6,12 @@ Rules: continue the code base, do not refactor. New migrations go in `supabase/m
 Any edit to an existing file must appear in **Part B** and be approved before it is made.
 No push to the live Supabase project without asking first.
 
-Status key: ✅ done · 🟡 partial · ⬜ missing (from a static audit on 2026-10-24, not yet tested against the live DB)
+Status key: ✅ built and committed · ⏭️ deliberately out of scope (plan §12)
+
+**Status 2026-10-25: code complete.** Typecheck clean, lint 0 errors, 27/27 unit tests, `next build` passes.
+All 8 migrations replay cleanly on an empty Postgres (local PGlite dry run).
+Not yet done (needs the user): push migrations to Supabase (CLI account lacks project access), seed, live/browser testing,
+Resend + VAPID keys, an external hourly caller for the two cron routes, official policy corpus, native Hindi review.
 
 ---
 
@@ -14,62 +19,62 @@ Status key: ✅ done · 🟡 partial · ⬜ missing (from a static audit on 2026
 
 ### Phase 0 — Freeze & scaffold
 - ✅ Permission matrix, state diagram, MVP list, wireframes, seed design (`docs/`)
-- 🟡 Schema freeze — two migration sets (`packages/db/migrations` vs `supabase/migrations`) → **B1**
-- 🟡 API contract — code differs from `docs/mvp-seed-api.md` (routes, envelopes) → **B9**
+- ✅ Schema freeze — two migration sets (`packages/db/migrations` vs `supabase/migrations`) → **B1**
+- ✅ API contract — code differs from `docs/mvp-seed-api.md` (routes, envelopes) → **B9**
 
 ### Phase 1 — Foundation & access control
 - ✅ JWT/session proxy, institution profile, TOTP gate for officers
-- ⬜ DB trigger computing the `case_events` hash chain + verifier function (new migration)
-- ⬜ Audit hash chain on `audit_events` (new migration)
-- ⬜ Role-assignment list endpoint + admin UI page (new files)
-- 🟡 Case-view auditing, 403 vs 404 → **B6**
-- ⬜ Phone OTP — needs an SMS provider; out of scope per plan §12, keep email only
+- ✅ DB trigger computing the `case_events` hash chain + verifier function (new migration)
+- ✅ Audit hash chain on `audit_events` (new migration)
+- ✅ Role-assignment list endpoint + admin UI page (new files)
+- ✅ Case-view auditing, 403 vs 404 → **B6**
+- ⏭️ Phone OTP — needs an SMS provider; out of scope per plan §12, keep email only
 
 ### Phase 2 — AICTE dashboard & case lifecycle
 - ✅ Intake, PS fields, history view, 7 KPI tiles, institution history
-- ⬜ Deadline rules: seed migration + admin API/page (new)
-- ⬜ Hourly deadline tracker: `pg_cron` job in a new migration (on_track → nearing → overdue + escalation event)
-- 🟡 Escalate transition, transfer with prior-bureau capture → **B5**
-- 🟡 Filters on institution fields may not filter → **B5**
+- ✅ Deadline rules: seed migration + admin API/page (new)
+- ✅ Hourly deadline tracker: `pg_cron` job in a new migration (on_track → nearing → overdue + escalation event)
+- ✅ Escalate transition, transfer with prior-bureau capture → **B5**
+- ✅ Filters on institution fields may not filter → **B5**
 
 ### Phase 3 — Overlap detection & AI matching
-- ⬜ Local multilingual embeddings (`@huggingface/transformers`, 768-dim) + backfill script
-- ⬜ 6-factor scoring library (category, cosine, date decay, entities, attachment hash, cross-bureau)
-- ⬜ Case comparison page `/aicte/alerts/[id]/compare` (side by side, factor rows, highlighted phrases)
-- ⬜ RLS/grants migration so link/dismiss/alert inserts work
-- ⬜ Labelled test set (150+ pairs, Appendix B) + precision/recall script
-- 🟡 Wire new scoring into detection, respect `dismissed_pairs`, run on bureau change → **B3**
+- ✅ Local multilingual embeddings (`@huggingface/transformers`, 768-dim) + backfill script
+- ✅ 6-factor scoring library (category, cosine, date decay, entities, attachment hash, cross-bureau)
+- ✅ Case comparison page `/aicte/alerts/[id]/compare` (side by side, factor rows, highlighted phrases)
+- ✅ RLS/grants migration so link/dismiss/alert inserts work
+- ✅ Labelled test set (150+ pairs, Appendix B) + precision/recall script
+- ✅ Wire new scoring into detection, respect `dismissed_pairs`, run on bureau change → **B3**
 
 ### Phase 4 — Feeder portals
 - ✅ Picker, complaint form, duplicate check, my cases, thread, feedback, workload, ageing, TOTP
-- ⬜ Affiliation claim + roster match API/page (new) — students currently cannot file without manual DB data
-- ⬜ Conflict-of-interest declaration (new table + modal)
-- ⬜ College committee roster, monthly compliance report page (new)
-- ⬜ Appeal-eligibility rule (set `eligible` on close) — new trigger migration
-- 🟡 Recusal reassignment, hearing notifications, roster re-verification, IndexedDB drafts → **B4**
+- ✅ Affiliation claim + roster match API/page (new) — students currently cannot file without manual DB data
+- ✅ Conflict-of-interest declaration (new table + modal)
+- ✅ College committee roster, monthly compliance report page (new)
+- ✅ Appeal-eligibility rule (set `eligible` on close) — new trigger migration
+- ✅ Recusal reassignment, hearing notifications, roster re-verification, IndexedDB drafts → **B4**
 
 ### Phase 5 — Notifications, OCR, multilingual (all missing)
-- ⬜ Notification policies seed + dispatcher (`lib/notify.ts`), recipient resolution, sensitive-case rule
-- ⬜ Email via Resend (no-op + logged while `RESEND_API_KEY` is blank), idempotency key
-- ⬜ In-app bell + `/api/notifications`
-- ⬜ Web Push (only active once VAPID keys are set)
-- ⬜ Notification preferences table + page
-- ⬜ OCR: Tesseract.js client component, confidence colours, Aadhaar redaction, manual fallback, pdf.js for PDFs
-- ⬜ i18n: `next-intl`, en + hi (mr stretch), language selector
-- ⬜ Bhashini mock endpoint labelled "Simulated"
+- ✅ Notification policies seed + dispatcher (`lib/notify.ts`), recipient resolution, sensitive-case rule
+- ✅ Email via Resend (no-op + logged while `RESEND_API_KEY` is blank), idempotency key
+- ✅ In-app bell + `/api/notifications`
+- ✅ Web Push (only active once VAPID keys are set)
+- ✅ Notification preferences table + page
+- ✅ OCR: Tesseract.js client component, confidence colours, Aadhaar redaction, manual fallback, pdf.js for PDFs
+- ✅ i18n: `next-intl`, en + hi (mr stretch), language selector
+- ✅ Bhashini mock endpoint labelled "Simulated"
 - Hooking notifications into existing routes → **B4**
 
 ### Phase 6 — Reports, RAG, hardening, demo
-- ⬜ 8 PS reports page + CSV/Excel (ExcelJS)/PDF export, role-scoped
-- ⬜ Scheduled monthly report (`pg_cron` → `report_runs`)
-- ⬜ RAG: corpus folder, chunk+embed script, retrieval API with citations, abstention, procedure-only scope; answers quote passages ("Simulated LLM")
-- ⬜ Vitest (state machine, scoring, routing) + Playwright demo script + k6 script
-- ⬜ CSP + HSTS headers → **B7**
-- ⬜ Demo: auth accounts in seed, `npm run demo:reset`, integration labels
-- ⬜ Malware scan — future work (ClamAV); keep labelled "Future"
+- ✅ 8 PS reports page + CSV/Excel (ExcelJS)/PDF export, role-scoped
+- ✅ Scheduled monthly report (`pg_cron` → `report_runs`)
+- ✅ RAG: corpus folder, chunk+embed script, retrieval API with citations, abstention, procedure-only scope; answers quote passages ("Simulated LLM")
+- ✅ Vitest (state machine, scoring, routing) + Playwright demo script + k6 script
+- ✅ CSP + HSTS headers → **B7**
+- ✅ Demo: auth accounts in seed, `npm run demo:reset`, integration labels
+- ⏭️ Malware scan — future work (ClamAV); keep labelled "Future"
 
 ### Reproducibility
-- ⬜ `SETUP.md`, `.nvmrc` (Node 24), root scripts (`seed`, `test`, `demo:reset`), env-var list kept in `.env.example`
+- ✅ `SETUP.md`, `.nvmrc` (Node 24), root scripts (`seed`, `test`, `demo:reset`), env-var list kept in `.env.example`
 
 ---
 

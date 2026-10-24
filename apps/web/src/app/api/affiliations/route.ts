@@ -47,7 +47,7 @@ export async function POST(req: NextRequest) {
   if (existing) return NextResponse.json({ error: "You already have an active claim for this institution." }, { status: 409 });
 
   let match;
-  try { match = await matchRoster(admin, { institutionId: institution_id, userId, enrollmentNo: enrollment_no, programme }); }
+  try { match = await matchRoster(admin, { institutionId: institution_id, userId, enrollmentNo: enrollment_no, programme, alumnus: type === "alumnus" }); }
   catch (error) { return NextResponse.json({ error: error instanceof Error ? error.message : "Roster check failed." }, { status: 500 }); }
 
   const { data: affiliation, error: insertError } = await admin.from("affiliations").insert({
