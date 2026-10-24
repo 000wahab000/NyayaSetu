@@ -73,7 +73,7 @@ Status key: ✅ done · 🟡 partial · ⬜ missing (from a static audit on 2026
 
 ---
 
-## Part B — Changes to existing code (need approval)
+## Part B — Changes to existing code (approved by user 2026-10-24: B1–B10)
 
 | # | Severity | Change | Files |
 |---|---|---|---|

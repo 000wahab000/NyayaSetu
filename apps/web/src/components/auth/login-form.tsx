@@ -11,8 +11,7 @@ export default function LoginForm() {
     const response = await fetch("/api/auth/otp", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email: targetEmail }) });
     const result = await response.json(); setBusy(false);
     if (!response.ok) return setError(result.error ?? "Could not send code.");
-    const codeParam = result.devOtp ? `&code=${encodeURIComponent(result.devOtp)}` : "";
-    window.location.href = `/auth/verify?email=${encodeURIComponent(targetEmail)}${codeParam}`;
+    window.location.assign(`/auth/verify?email=${encodeURIComponent(targetEmail)}`);
   }
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {

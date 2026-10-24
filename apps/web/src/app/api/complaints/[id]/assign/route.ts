@@ -47,23 +47,17 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  // Append event
-  const { data: lastEvent } = await supabase.from("case_events")
-    .select("event_hash").eq("complaint_id", id)
-    .order("event_at", { ascending: false }).limit(1).maybeSingle();
-
+  // event_hash and prev_event_hash are computed by the DB trigger on insert.
   const eventPayload = { assigned_bureau, assigned_officer, remarks };
-  const hashInput = `${lastEvent?.event_hash ?? ""}|assignment|${user.id}|${now}|${JSON.stringify(eventPayload)}`;
-  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(hashInput));
-  const eventHash = Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, "0")).join("");
-
-  await supabase.from("case_events").insert({
+  const { error: eventError } = await supabase.from("case_events").insert({
     complaint_id: id, event_type: "assignment",
     actor_id: user.id, actor_role: role,
     bureau: req.headers.get("x-user-bureau") ?? null,
     new_state: eventPayload, remarks,
-    event_at: now, prev_event_hash: lastEvent?.event_hash ?? null, event_hash: eventHash,
+    event_at: now,
   });
+
+  if (eventError) return NextResponse.json({ error: "Assignment saved, but its event could not be recorded." }, { status: 500 });
 
   return NextResponse.json({ success: true });
 }
