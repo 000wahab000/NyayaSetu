@@ -7,11 +7,13 @@ const ROLE_PREFIX: Record<string, Role[]> = {
   "/student": ["student"], "/faculty": ["faculty"], "/college": ["college_management"],
   "/aicte": ["pgrc_triage_officer", "bureau_officer", "regional_officer", "bureau_head", "competent_authority", "ombudsperson", "auditor", "system_admin"],
 };
-const OPEN = ["/auth", "/api/auth", "/_next", "/favicon.ico"];
+const OPEN = ["/auth", "/api/auth", "/_next", "/favicon.ico", "/manifest.webmanifest", "/nyayasetu.svg"];
 
 export async function proxy(request: NextRequest) {
   const path = request.nextUrl.pathname;
-  if (OPEN.some((prefix) => path === prefix || path.startsWith(`${prefix}/`))) return NextResponse.next();
+  if (path === "/" || OPEN.some((prefix) => path === prefix || path.startsWith(`${prefix}/`))) {
+    return NextResponse.next();
+  }
   const env = getPublicEnv();
   let response = NextResponse.next({ request });
   const supabase = createServerClient(env.NEXT_PUBLIC_SUPABASE_URL, env.NEXT_PUBLIC_SUPABASE_ANON_KEY, {
@@ -24,13 +26,16 @@ export async function proxy(request: NextRequest) {
   const isApi = path.startsWith("/api/");
   const reject = (status: number, destination?: string) => isApi
     ? NextResponse.json({ error: status === 401 ? "Unauthenticated" : "Forbidden" }, { status })
-    : destination ? NextResponse.redirect(new URL(destination, request.url))
-      : new NextResponse(status === 401 ? "Unauthenticated" : "Forbidden", { status });
-  if (error || !user) return reject(401);
+    : destination
+      ? NextResponse.redirect(new URL(destination, request.url))
+      : status === 401
+        ? NextResponse.redirect(new URL("/auth/login", request.url))
+        : new NextResponse("Forbidden", { status });
+  if (error || !user) return reject(401, "/auth/login");
   const sessionId = request.cookies.get("nyaya_session")?.value;
-  if (!sessionId) return reject(401);
+  if (!sessionId) return reject(401, "/auth/login");
   const { data: activeSession, error: sessionError } = await supabase.from("user_sessions").select("id").eq("auth_session_id", sessionId).eq("user_id", user.id).is("revoked_at", null).maybeSingle();
-  if (sessionError || !activeSession) return reject(401);
+  if (sessionError || !activeSession) return reject(401, "/auth/login");
   const { data: assignments, error: roleError } = await supabase.from("role_assignments").select("role,bureau,institution_id,region").eq("user_id", user.id).is("revoked_at", null);
   if (roleError || !assignments?.length) return reject(403, "/auth/login?error=account_not_provisioned");
   const assignment = assignments.find((item) => ROLES.includes(item.role as Role));

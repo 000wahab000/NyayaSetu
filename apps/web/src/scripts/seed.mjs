@@ -78,8 +78,10 @@ async function seed() {
     { user_id: "00000000-0000-0000-0000-000000000007", role: "competent_authority", granted_by: rbId, reason: "DEMO seed" },
     { user_id: "00000000-0000-0000-0000-000000000008", role: "auditor",   granted_by: rbId, reason: "DEMO seed" },
   ];
-  await supabase.from("role_assignments").upsert(roleAssignments, { onConflict: "user_id,role" }).select();
-  console.log(`   ✅ ${roleAssignments.length} role assignments`);
+  await supabase.from("role_assignments").delete().in("user_id", roleAssignments.map(r => r.user_id));
+  const { error: roleErr } = await supabase.from("role_assignments").insert(roleAssignments);
+  if (roleErr) console.error("Role insert error:", roleErr);
+  else console.log(`   ✅ ${roleAssignments.length} role assignments`);
 
   // 4. Complaints — 30 records across lifecycle states
   console.log("📋 Inserting complaints...");
