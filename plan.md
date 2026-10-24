@@ -89,7 +89,7 @@ Status key: ✅ done · 🟡 partial · ⬜ missing (from a static audit on 2026
 | B9 | Low | Update `docs/mvp-seed-api.md` to match the routes as built (docs only, no code change) | `docs/mvp-seed-api.md` |
 | B10 | Low | Add nav links to new pages in existing layouts/home | `components/portal-home.tsx`, portal pages |
 
-| B11 | Medium | **Not yet approved.** `complaints_student_insert` RLS requires a *verified* affiliation, but plan §3.3 says unverified students may still file (held at AICTE triage, never auto-forwarded). Needs a new migration replacing that policy | new migration (replaces existing policy) |
+| B11 | Medium | **Approved 2026-10-24.** `complaints_student_insert` RLS requires a *verified* affiliation, but plan §3.3 says unverified students may still file (held at AICTE triage, never auto-forwarded). Needs a new migration replacing that policy | new migration (replaces existing policy) |
 
 ---
 
