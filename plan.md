@@ -83,6 +83,7 @@ Status key: ✅ done · 🟡 partial · ⬜ missing (from a static audit on 2026
 | B4 | Medium | Hook notifications into existing routes (transition, assign, hearings, recuse, roster upload re-verification, feedback/appeal); IndexedDB drafts | the matching `api/**/route.ts`, `complaint-form.tsx` |
 | B5 | Medium | State machine: add escalate + transfer prior-bureau; fix institution filters with `!inner` | `lib/state-machine.ts`, `api/complaints/route.ts` |
 | B6 | Medium | Audit case views; return 403 (not 404) on denials; check event-insert errors; stop swallowing audit failures | `api/complaints/[id]/route.ts`, `events/route.ts`, `transition/route.ts`, `assign/route.ts` |
+| B6b | Medium | Routes stop computing `event_hash` themselves (their `|`-separated format differs) and let the new DB trigger do it, so `verify_case_event_chain` works | `transition`, `assign`, `events`, `appeal` routes |
 | B7 | Low | Add CSP + HSTS | `next.config.ts` |
 | B8 | Low | Service worker caches an authenticated page; switch to drafts-only | `public/sw.js` |
 | B9 | Low | Update `docs/mvp-seed-api.md` to match the routes as built (docs only, no code change) | `docs/mvp-seed-api.md` |
