@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { get, set, del } from "idb-keyval";
 type Institution = { id: string; name: string; aicte_permanent_id: string };
 type Draft = { institution: string; q: string; category: string; description: string; language: string; confidential: boolean; management: boolean; urgent: boolean; bureau: string };
 const CATEGORIES = ["financial", "ragging", "academic", "infrastructure", "other"];
@@ -11,15 +12,23 @@ export function ComplaintForm({ institutions, intake = false }: { institutions: 
   const [description, setDescription] = useState(""), [language, setLanguage] = useState("en"), [confidential, setConfidential] = useState(false), [management, setManagement] = useState(false);
   const [urgent, setUrgent] = useState(false), [bureau, setBureau] = useState(""), [error, setError] = useState(""), [busy, setBusy] = useState(false);
   const [duplicate, setDuplicate] = useState(""), [ready, setReady] = useState(false);
+  const [online, setOnline] = useState(true), [draftReady, setDraftReady] = useState(false);
   useEffect(() => {
-    const timer = window.setTimeout(() => {
-      try { const raw = localStorage.getItem(draftKey); if (raw) { const d = JSON.parse(raw) as Partial<Draft>; setInstitution(d.institution ?? ""); setQ(d.q ?? ""); setCategory(d.category ?? "academic"); setDescription(d.description ?? ""); setLanguage(d.language ?? "en"); setConfidential(d.confidential ?? false); setManagement(d.management ?? false); setUrgent(d.urgent ?? false); setBureau(d.bureau ?? ""); } }
-      catch { localStorage.removeItem(draftKey); }
+    let alive = true;
+    get<Partial<Draft>>(draftKey).then(d => {
+      if (!alive) return;
+      if (d) { setInstitution(d.institution ?? ""); setQ(d.q ?? ""); setCategory(d.category ?? "academic"); setDescription(d.description ?? ""); setLanguage(d.language ?? "en"); setConfidential(d.confidential ?? false); setManagement(d.management ?? false); setUrgent(d.urgent ?? false); setBureau(d.bureau ?? ""); }
       setReady(true);
-    }, 0);
-    return () => window.clearTimeout(timer);
+    }).catch(() => { if (alive) setReady(true); });
+    return () => { alive = false; };
   }, [draftKey]);
-  useEffect(() => { if (ready) localStorage.setItem(draftKey, JSON.stringify({ institution, q, category, description, language, confidential, management, urgent, bureau } satisfies Draft)); }, [ready, draftKey, institution, q, category, description, language, confidential, management, urgent, bureau]);
+  useEffect(() => { if (ready) set(draftKey, { institution, q, category, description, language, confidential, management, urgent, bureau } satisfies Draft).catch(() => {}); }, [ready, draftKey, institution, q, category, description, language, confidential, management, urgent, bureau]);
+  useEffect(() => {
+    const goOnline = () => { setOnline(true); setDraftReady(true); }, goOffline = () => setOnline(false);
+    setOnline(navigator.onLine);
+    window.addEventListener("online", goOnline); window.addEventListener("offline", goOffline);
+    return () => { window.removeEventListener("online", goOnline); window.removeEventListener("offline", goOffline); };
+  }, []);
   const filtered = useMemo(() => institutions.filter(i => `${i.name} ${i.aicte_permanent_id}`.toLowerCase().includes(q.toLowerCase())).slice(0, 8), [institutions, q]);
   async function checkDuplicates() {
     setDuplicate(""); setError("");
@@ -40,12 +49,14 @@ export function ComplaintForm({ institutions, intake = false }: { institutions: 
     try {
       const r = await fetch("/api/complaints", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ institution_id: institution, category, description_text: description, description_language: language, is_confidential: confidential, involves_management: management, urgency_status: urgent ? "urgent" : "untriaged", assigned_bureau: bureau || null }) });
       const d = await r.json(); if (!r.ok) throw new Error(d.error?.message ?? d.error ?? "Could not submit case.");
-      localStorage.removeItem(draftKey); router.push(`${intake ? "/aicte/cases" : "/student/cases"}/${d.complaint.id}`); router.refresh();
+      await del(draftKey); router.push(`${intake ? "/aicte/cases" : "/student/cases"}/${d.complaint.id}`); router.refresh();
     } catch (err) { setError(err instanceof Error ? err.message : "Submission failed."); }
     finally { setBusy(false); }
   }
   return <form className="p4-card p4-form" onSubmit={submit}>
     {!intake && <p className="p4-banner">Drafts are saved on this device and restored when you return. Submit when you’re back online.</p>}
+    {!intake && !online && (description || q) && <p className="p4-banner" role="status">You’re offline. Your draft is saved on this device.</p>}
+    {!intake && online && draftReady && (description || q) && <p className="p4-banner" role="status">Draft ready to submit. Review it and submit now; the server records the receipt time.</p>}
     <label>Institution <input value={q} onChange={e => { setQ(e.target.value); setInstitution(""); setDuplicate(""); }} placeholder="Search name or AICTE ID" required />{q && !institution && <div className="p4-options">{filtered.map(i => <button type="button" key={i.id} onClick={() => { setInstitution(i.id); setQ(`${i.name} · ${i.aicte_permanent_id}`); }}>{i.name} · {i.aicte_permanent_id}</button>)}</div>}</label>
     <label>Category <select value={category} onChange={e => setCategory(e.target.value)}>{CATEGORIES.map(x => <option key={x}>{x}</option>)}</select></label>
     <label>Description <textarea value={description} onChange={e => { setDescription(e.target.value); setDuplicate(""); }} minLength={10} maxLength={10000} rows={7} required placeholder="Describe the issue in at least two sentences."/><small>{description.length}/10,000 characters {description.trim().length > 0 && description.trim().length < 50 && <span className="p4-warning"> · Please add more detail (under 50 characters).</span>}</small></label>
