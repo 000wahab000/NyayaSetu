@@ -1,5 +1,6 @@
 import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { notify } from "@/lib/notify";
 
 type Db = ReturnType<typeof createAdminClient>;
 
@@ -15,5 +16,6 @@ export async function recuseFaculty(db: Db, caseId: string, userId: string, reas
     { complaint_id: caseId, event_type: "reassignment_needed", actor_id: userId, actor_role: "faculty", remarks: "Faculty member recused. Committee reassignment needed.", visibility: "college", event_at: now },
   ]);
   if (eventError) throw new Error(eventError.message);
+  void notify({ event_type: "reassignment_needed", complaint_id: caseId, ref: now, actor_id: userId });
   return true;
 }

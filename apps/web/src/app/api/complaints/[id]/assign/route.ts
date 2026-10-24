@@ -3,6 +3,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { z } from "zod";
+import { notify } from "@/lib/notify";
 
 const Schema = z.object({
   assigned_bureau:  z.string().optional(),
@@ -58,6 +59,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   });
 
   if (eventError) return NextResponse.json({ error: "Assignment saved, but its event could not be recorded." }, { status: 500 });
+
+  if (assigned_officer) void notify({ event_type: "case_assigned", complaint_id: id, ref: String(version + 1), actor_id: user.id });
 
   if (assigned_bureau && assigned_bureau !== complaint.assigned_bureau)
     fetch(`${req.nextUrl.origin}/api/overlap/detect`,{method:"POST",headers:{cookie:req.headers.get("cookie")??"","x-user-role":role}}).catch(()=>{});

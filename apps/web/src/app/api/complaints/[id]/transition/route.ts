@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { isValidTransition, canRoleTransition, canRoleEscalate, ESCALATE_ACTION, type LifecycleStatus } from "@/lib/state-machine";
 import { z } from "zod";
+import { notify } from "@/lib/notify";
 
 const Schema = z.object({
   to_status: z.string(),
@@ -109,6 +110,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   });
 
   if (eventError) return NextResponse.json({ error: "Status changed but its event could not be recorded." }, { status: 500 });
+
+  void notify({ event_type: "status_changed", complaint_id: id, ref: String(version + 1), actor_id: user.id });
+  if (toStatus === "referred") void notify({ event_type: "referred_to_college", complaint_id: id, ref: String(version + 1), actor_id: user.id });
+  if (toStatus === "decision_recorded") void notify({ event_type: "decision_recorded", complaint_id: id, ref: String(version + 1), actor_id: user.id });
 
   return NextResponse.json({ success: true, new_status: toStatus, version: version + 1 });
 }

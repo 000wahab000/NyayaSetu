@@ -3,6 +3,7 @@ import { z } from "zod";
 import { getApiSession } from "@/lib/auth/api-session";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { auditLog } from "@/lib/audit";
+import { notify } from "@/lib/notify";
 
 const Input = z.object({ event_type: z.enum(["officer_response", "faculty_response", "officer_action", "case_message", "complainant_update", "evidence_added"]), remarks: z.string().max(5000).optional(), evidence_id: z.string().uuid().optional() });
 type Ctx = { params: Promise<{ id: string }> };
@@ -57,5 +58,6 @@ export async function POST(req: NextRequest, { params }: Ctx) {
   }
   try { await auditLog({ actor_id: session.userId, action: `complaint.${type}`, resource_type: "complaint", resource_id: id, new_value: payload }); }
   catch { return NextResponse.json({ error: "Event recorded but the audit log could not be written." }, { status: 500 }); }
+  void notify({ event_type: "case_message", complaint_id: id, ref: event.id, actor_id: session.userId });
   return NextResponse.json({ event });
 }

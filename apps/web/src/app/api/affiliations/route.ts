@@ -10,7 +10,14 @@ const Body = z.object({
   enrollment_no: z.string().trim().regex(/^[A-Za-z0-9\/-]{3,40}$/, "Enter a valid enrollment number."),
   programme: z.string().trim().min(2).max(120),
   type: z.enum(["current", "alumnus"]),
+  // Optional on-device OCR result. Only text and user-corrected fields arrive here; the ID image is never uploaded.
+  ocr: z.object({
+    raw: z.string().max(20000),
+    confidence: z.number().min(0).max(1),
+    corrected: z.record(z.string().max(40), z.string().max(200)),
+  }).optional(),
 });
+const AADHAAR = /\b\d{4}\s?\d{4}\s?\d{4}\b/g;
 
 export async function GET() {
   const auth = await getApiSession();
@@ -29,7 +36,7 @@ export async function POST(req: NextRequest) {
   if (auth.session.role !== "student") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   const parsed = Body.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
-  const { institution_id, enrollment_no, programme, type } = parsed.data;
+  const { institution_id, enrollment_no, programme, type, ocr } = parsed.data;
   const userId = auth.session.userId, type_db = type === "current" ? "current_student" : "alumnus";
   const admin = createAdminClient();
 
@@ -47,7 +54,12 @@ export async function POST(req: NextRequest) {
     user_id: userId, institution_id, type: type_db, enrollment_no, programme, status: match.verdict,
   }).select("id,institution_id,type,status,enrollment_no,programme,claimed_at").single();
   if (insertError) return NextResponse.json({ error: insertError.message }, { status: 500 });
-  const { error: attemptError } = await admin.from("verification_attempts").insert({ affiliation_id: affiliation.id, method: "roster", outcome: match.verdict });
+  const { error: attemptError } = await admin.from("verification_attempts").insert({
+    affiliation_id: affiliation.id, method: ocr ? "document" : "roster", outcome: match.verdict,
+    ocr_raw: ocr ? { text: ocr.raw.replace(AADHAAR, "XXXX XXXX XXXX") } : null,
+    user_corrected: ocr ? ocr.corrected : null,
+    ocr_confidence: ocr ? ocr.confidence : null,
+  });
   if (attemptError) return NextResponse.json({ error: attemptError.message }, { status: 500 });
   await auditLog({ actor_id: userId, action: "affiliation.claimed", resource_type: "affiliation", resource_id: affiliation.id, new_value: { institution_id, type: type_db, status: match.verdict } });
   return NextResponse.json({ affiliation }, { status: 201 });

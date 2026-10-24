@@ -24,3 +24,19 @@ self.addEventListener("fetch", (event) => {
     })());
   }
 });
+
+// Web Push: show a notification with only the case id, event label and link. Never complaint text.
+self.addEventListener("push", (event) => {
+  let payload = { title: "NyayaSetu", body: "You have a new update.", link: "/" };
+  try { payload = { ...payload, ...event.data.json() }; } catch { /* keep defaults */ }
+  event.waitUntil(self.registration.showNotification(payload.title, { body: payload.body, data: { link: payload.link }, icon: "/nyayasetu.svg", tag: payload.link }));
+});
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const link = event.notification.data?.link || "/";
+  event.waitUntil(self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clients) => {
+    const open = clients.find((client) => new URL(client.url).pathname === link);
+    if (open) return open.focus();
+    return self.clients.openWindow(link);
+  }));
+});
