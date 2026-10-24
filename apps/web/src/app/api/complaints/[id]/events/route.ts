@@ -1,84 +1,67 @@
-// GET /api/complaints/[id]/events — full action history for a case
-// POST /api/complaints/[id]/events — append a new action event
-
-import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
+import { getApiSession } from "@/lib/auth/api-session";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { auditLog } from "@/lib/audit";
 
-export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+const Input = z.object({ event_type: z.enum(["officer_response", "faculty_response", "officer_action", "case_message", "complainant_update", "evidence_added"]), remarks: z.string().max(5000).optional(), evidence_id: z.string().uuid().optional() });
+type Ctx = { params: Promise<{ id: string }> };
+
+export async function GET(_req: NextRequest, { params }: Ctx) {
+  const auth = await getApiSession(); if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { id } = await params;
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
-  const { data, error } = await supabase
-    .from("case_events")
-    .select(`*, users!actor_id(display_name)`)
-    .eq("complaint_id", id)
-    .order("event_at", { ascending: true });
-
+  const { data: c } = await auth.supabase.from("complaints").select("id,institution_id,submitted_by,involves_management,status").eq("id", id).maybeSingle();
+  if (!c) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  const role = auth.session.role;
+  if (role === "student" && c.submitted_by !== auth.session.userId) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  if (role === "college_management" && (c.institution_id !== auth.session.institutionId || c.involves_management || !["referred", "awaiting_response", "under_examination"].includes(c.status))) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  let q = auth.supabase.from("case_events").select("id,event_type,actor_role,remarks,event_at,visibility").eq("complaint_id", id).order("event_at", { ascending: true });
+  if (role === "student") q = q.in("visibility", ["public", "complainant"]);
+  if (role === "college_management") q = q.in("visibility", ["college", "public"]);
+  const { data, error } = await q;
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ data });
+  const events = (data ?? []).map((e) => role === "student" && ["pgrc_triage_officer", "bureau_officer", "bureau_head"].includes(e.actor_role) ? { ...e, actor_role: "AICTE Officer" } : e);
+  return NextResponse.json({ events });
 }
 
-const AppendEventSchema = z.object({
-  event_type: z.string().min(1),
-  remarks:    z.string().min(1),
-  old_state:  z.record(z.string(), z.unknown()).optional(),
-  new_state:  z.record(z.string(), z.unknown()).optional(),
-  document_ids: z.array(z.string().uuid()).optional(),
-});
+export async function POST(req: NextRequest, { params }: Ctx) {
+  const auth = await getApiSession(); if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const input = Input.safeParse(await req.json().catch(() => null));
+  if (!input.success) return NextResponse.json({ error: input.error.flatten() }, { status: 400 });
+  const { id } = await params, { session } = auth, admin = createAdminClient();
+  const { data: c } = await admin.from("complaints").select("id,institution_id,submitted_by,involves_management,status,version").eq("id", id).maybeSingle();
+  if (!c) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  const student = session.role === "student" && c.submitted_by === session.userId;
+  const college = session.role === "college_management" && c.institution_id === session.institutionId && !c.involves_management && ["referred", "awaiting_response", "under_examination"].includes(c.status);
+  const staffRole = ["faculty", "pgrc_triage_officer", "bureau_officer", "bureau_head", "regional_officer", "competent_authority", "ombudsperson", "auditor", "system_admin"].includes(session.role);
+  const { data: staffVisible } = staffRole ? await auth.supabase.from("complaints").select("id").eq("id", id).maybeSingle() : { data: null };
+  const staff = staffRole && !!staffVisible;
+  if (!student && !college && !staff) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  const type = input.data.event_type;
+  if (input.data.evidence_id) {
+    const { data: evidence } = await admin.from("evidence").select("id").eq("id", input.data.evidence_id).eq("complaint_id", id).eq("uploaded_by", session.userId).maybeSingle();
+    if (!evidence) return NextResponse.json({ error: "Evidence does not belong to this case or session." }, { status: 400 });
+  }
+  if ((college && !["officer_response", "case_message"].includes(type)) || (student && !["complainant_update", "evidence_added", "case_message"].includes(type)) || (session.role === "faculty" && !["faculty_response", "case_message"].includes(type)) || (staff && session.role !== "faculty" && type !== "officer_action")) return NextResponse.json({ error: "Invalid event for this portal." }, { status: 403 });
+  if (["officer_response", "faculty_response", "case_message"].includes(type) && (input.data.remarks?.trim().length ?? 0) < 10) return NextResponse.json({ error: "Please enter at least 10 characters." }, { status: 400 });
+  if (student && !["submitted", "under_triage", "referred", "awaiting_response", "under_examination"].includes(c.status)) return NextResponse.json({ error: "This case no longer accepts updates." }, { status: 409 });
+  if (college && c.status === "referred") return NextResponse.json({ error: "This referral is not yet awaiting an institution response." }, { status: 409 });
 
-export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params;
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const now = new Date().toISOString(), payload = { remarks: input.data.remarks ?? null, evidence_id: input.data.evidence_id ?? null };
+  const { data: last } = await admin.from("case_events").select("event_hash").eq("complaint_id", id).order("event_at", { ascending: false }).limit(1).maybeSingle();
+  const previous = last?.event_hash ?? null, hash = await hashEvent(previous, type, session.userId, now, payload);
+  const visibility = type === "officer_action" ? "internal" : college && type === "officer_response" ? "college" : type === "case_message" || type === "faculty_response" ? "public" : student ? "complainant" : "internal";
+  const { data: event, error } = await admin.from("case_events").insert({ complaint_id: id, event_type: type, actor_id: session.userId, actor_role: session.role, remarks: payload.remarks, new_state: college && type === "officer_response" ? { status: "under_examination" } : null, document_ids: input.data.evidence_id ? [input.data.evidence_id] : [], visibility, event_at: now, prev_event_hash: previous, event_hash: hash }).select("id,event_type,actor_role,remarks,event_at,visibility").single();
+  if (error || !event) return NextResponse.json({ error: error?.message ?? "Could not record event." }, { status: 500 });
+  if (college && type === "officer_response" && c.status === "awaiting_response") {
+    const { error: updateError } = await admin.from("complaints").update({ status: "under_examination", last_action_at: now, version: c.version + 1 }).eq("id", id).eq("version", c.version);
+    if (updateError) return NextResponse.json({ error: "Response event saved, but case status update failed." }, { status: 500 });
+  }
+  await auditLog({ actor_id: session.userId, action: `complaint.${type}`, resource_type: "complaint", resource_id: id, new_value: payload }).catch(() => {});
+  return NextResponse.json({ event });
+}
 
-  const role   = req.headers.get("x-user-role") ?? "";
-  const bureau = req.headers.get("x-user-bureau") ?? null;
-
-  const body   = await req.json();
-  const parsed = AppendEventSchema.safeParse(body);
-  if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
-
-  const { event_type, remarks, old_state, new_state, document_ids } = parsed.data;
-  const now = new Date().toISOString();
-
-  // Get last event hash for chain
-  const { data: lastEvent } = await supabase
-    .from("case_events")
-    .select("event_hash")
-    .eq("complaint_id", id)
-    .order("event_at", { ascending: false })
-    .limit(1).maybeSingle();
-
-  const payload   = { event_type, actor: user.id, remarks, new_state };
-  const hashInput = `${lastEvent?.event_hash ?? ""}|${event_type}|${user.id}|${now}|${JSON.stringify(payload)}`;
-  const buf       = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(hashInput));
-  const eventHash = Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, "0")).join("");
-
-  const { data, error } = await supabase.from("case_events").insert({
-    complaint_id:    id,
-    event_type,
-    actor_id:        user.id,
-    actor_role:      role,
-    bureau,
-    old_state:       old_state ?? null,
-    new_state:       new_state ?? null,
-    remarks,
-    document_ids:    document_ids ?? [],
-    event_at:        now,
-    prev_event_hash: lastEvent?.event_hash ?? null,
-    event_hash:      eventHash,
-  }).select().single();
-
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-
-  // Update last_action_at on complaint
-  await supabase.from("complaints")
-    .update({ last_action_at: now, updated_at: now })
-    .eq("id", id);
-
-  return NextResponse.json({ data }, { status: 201 });
+async function hashEvent(previous: string | null, type: string, actor: string, at: string, payload: unknown) {
+  const bytes = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(`${previous ?? ""}|${type}|${actor}|${at}|${JSON.stringify(payload)}`));
+  return Array.from(new Uint8Array(bytes)).map((v) => v.toString(16).padStart(2, "0")).join("");
 }

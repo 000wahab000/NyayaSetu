@@ -40,7 +40,16 @@ export async function proxy(request: NextRequest) {
   if (!hasRequiredMfa(role, aal?.currentLevel)) return reject(403, "/auth/totp");
   const matchedPrefix = Object.keys(ROLE_PREFIX).find((prefix) => path === prefix || path.startsWith(`${prefix}/`));
   if (matchedPrefix && !ROLE_PREFIX[matchedPrefix].includes(role)) return reject(403);
-  if (matchedPrefix) { response.headers.set("Cache-Control", "private, no-store"); return response; }
+  const forwardedHeaders = new Headers(request.headers);
+  forwardedHeaders.set("x-user-id", user.id);
+  forwardedHeaders.set("x-user-role", role);
+  forwardedHeaders.set("x-user-institution", assignment.institution_id ?? "");
+  forwardedHeaders.set("x-user-bureau", assignment.bureau ?? "");
+  forwardedHeaders.set("x-user-region", assignment.region ?? "");
+  const refreshedCookies = response.cookies.getAll();
+  response = NextResponse.next({ request: { headers: forwardedHeaders } });
+  refreshedCookies.forEach(({ name, value, ...options }) => response.cookies.set(name, value, options));
+  response.headers.set("Cache-Control", "private, no-store");
   return response;
 }
 

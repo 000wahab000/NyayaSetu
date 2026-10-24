@@ -1,30 +1,5 @@
-// API: GET  /api/complaints/[id]       — full case detail
-//      POST /api/complaints/[id]/transition — state machine transition
-//      POST /api/complaints/[id]/assign     — assign bureau + officer
-//      POST /api/complaints/[id]/transfer   — transfer to another bureau
-
-import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
-import { isValidTransition, canRoleTransition, type LifecycleStatus } from "@/lib/state-machine";
+import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
-
-export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params;
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
-  const { data, error } = await supabase
-    .from("complaints")
-    .select(`
-      *, 
-      institutions(id, name, aicte_permanent_id, region, type, status),
-      users!submitted_by(display_name, email),
-      users!assigned_officer(display_name, email)
-    `)
-    .eq("id", id)
-    .single();
-
-  if (error || !data) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  return NextResponse.json({ data });
-}
+import { getApiSession } from "@/lib/auth/api-session";
+const Params=z.object({id:z.string().uuid()});
+export async function GET(_req:NextRequest,{params}:{params:Promise<{id:string}>}){const auth=await getApiSession();if(!auth)return NextResponse.json({error:"Unauthorized"},{status:401});const p=Params.safeParse(await params);if(!p.success)return NextResponse.json({error:"Not found"},{status:404});const {session,supabase}=auth;const {data:row,error}=await supabase.from("complaints").select("id,case_id,institution_id,submitted_by,category,description_text,status,verification_status,coordination_status,deadline_status,appeal_status,receipt_date,expected_disposal_at,is_confidential,involves_management,created_at,updated_at,institutions(name)").eq("id",p.data.id).maybeSingle();if(error||!row)return NextResponse.json({error:"Not found"},{status:404});if(session.role==="student"&&row.submitted_by!==session.userId)return NextResponse.json({error:"Not found"},{status:404});if(session.role==="college_management"){if(row.institution_id!==session.institutionId||row.involves_management||!(["referred","awaiting_response","under_examination"].includes(row.status)))return NextResponse.json({error:"Not found"},{status:404});return NextResponse.json({complaint:{...row,description_text:"Details withheld. Please review and respond to this referred case.",submitted_by:undefined}})}if(session.role==="faculty")return NextResponse.json({error:"Forbidden"},{status:403});return NextResponse.json({complaint:row})}

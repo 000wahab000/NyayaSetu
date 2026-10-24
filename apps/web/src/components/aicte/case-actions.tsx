@@ -13,7 +13,7 @@ type Props = {
   role: string;
 };
 
-export default function CaseActions({ complaintId, currentStatus, currentVersion, nextStates, role }: Props) {
+export default function CaseActions({ complaintId, currentVersion, nextStates }: Props) {
   const router = useRouter();
   const [mode, setMode]       = useState<"idle"|"transition"|"action">("idle");
   const [toStatus, setToStatus] = useState<string>("");

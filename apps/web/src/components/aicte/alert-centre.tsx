@@ -2,7 +2,6 @@
 // Overlap Alert Centre — tabbed view of coordination and related case alerts.
 
 import { useEffect, useState, useCallback } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { STATUS_LABELS, STATUS_COLORS, type LifecycleStatus } from "@/lib/state-machine";
 
@@ -17,7 +16,6 @@ type Alert = {
 type ActionModal = { alertId: string; action: "link" | "dismiss" } | null;
 
 export default function AlertCentre() {
-  const router = useRouter();
   const [alerts, setAlerts]       = useState<Alert[]>([]);
   const [counts, setCounts]       = useState({ coordination: 0, related: 0 });
   const [tab, setTab]             = useState<"coordination" | "related">("coordination");
@@ -36,7 +34,7 @@ export default function AlertCentre() {
       .catch(() => setLoading(false));
   }, [tab]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { const timer = window.setTimeout(load, 0); return () => window.clearTimeout(timer); }, [load]);
 
   async function runDetection() {
     setDetecting(true);

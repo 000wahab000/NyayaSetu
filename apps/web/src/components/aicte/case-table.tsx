@@ -44,7 +44,7 @@ export default function CaseTable() {
       .catch(() => setLoading(false));
   }, [page, filters]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { const timer = window.setTimeout(load, 0); return () => window.clearTimeout(timer); }, [load]);
 
   const setFilter = (k: string, v: string) => {
     setFilters(f => ({ ...f, [k]: v }));

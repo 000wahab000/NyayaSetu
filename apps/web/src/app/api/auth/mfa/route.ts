@@ -17,9 +17,12 @@ export async function GET() {
   if (assurance?.currentLevel === "aal2") return NextResponse.json({ aal2: true });
   const { data: factors, error: listError } = await supabase.auth.mfa.listFactors();
   if (listError) return NextResponse.json({ error: "Could not load authenticator factors." }, { status: 502 });
-  const verified = factors?.totp?.find((item) => item.status === "verified");
+  // Supabase's current SDK types listFactors() as verified-only, but the API can
+  // also return an unfinished enrollment with QR/secret values.
+  const totpFactors = factors?.totp as Array<{ id: string; status: string; qr_code?: string; secret?: string }> | undefined;
+  const verified = totpFactors?.find((item) => item.status === "verified");
   if (verified) return NextResponse.json({ factorId: verified.id });
-  const pending = factors?.totp?.find((item) => item.status === "unverified");
+  const pending = totpFactors?.find((item) => item.status === "unverified");
   if (pending) return NextResponse.json({ factorId: pending.id, qr: pending.qr_code, secret: pending.secret });
   const { data, error } = await supabase.auth.mfa.enroll({ factorType: "totp", friendlyName: `NyayaSetu ${session.role}` });
   if (error || !data) return NextResponse.json({ error: "Could not start authenticator enrollment." }, { status: 502 });
