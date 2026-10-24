@@ -59,5 +59,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
   if (eventError) return NextResponse.json({ error: "Assignment saved, but its event could not be recorded." }, { status: 500 });
 
+  if (assigned_bureau && assigned_bureau !== complaint.assigned_bureau)
+    fetch(`${req.nextUrl.origin}/api/overlap/detect`,{method:"POST",headers:{cookie:req.headers.get("cookie")??"","x-user-role":role}}).catch(()=>{});
+
   return NextResponse.json({ success: true });
 }
