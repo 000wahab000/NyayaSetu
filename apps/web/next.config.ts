@@ -22,7 +22,8 @@ const contentSecurityPolicy = [
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
-  serverExternalPackages: ["@huggingface/transformers", "onnxruntime-node"],
+  // pdfkit loads its built-in font metrics from disk at runtime, so it must not be bundled.
+  serverExternalPackages: ["@huggingface/transformers", "onnxruntime-node", "pdfkit"],
   async headers() {
     return [{ source: "/(.*)", headers: [
       { key: "X-Content-Type-Options", value: "nosniff" },

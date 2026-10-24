@@ -37,7 +37,7 @@ async function usersForRole(db: Db, role: string, c: Complaint): Promise<string[
   return (data ?? []).map((r) => r.user_id);
 }
 
-async function sendEmail(to: string, subject: string, text: string) {
+export async function sendEmail(to: string, subject: string, text: string) {
   const res = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}`, "Content-Type": "application/json" },

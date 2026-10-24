@@ -60,6 +60,14 @@ export default async function AicteHome() {
           </div>
           <div className="flex gap-2 items-center">
             <NotificationBell />
+            <Link href="/aicte/reports"
+              className="border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-sm font-medium px-4 py-2 rounded-lg transition-colors">
+              Reports
+            </Link>
+            <Link href="/aicte/assistant"
+              className="border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-sm font-medium px-4 py-2 rounded-lg transition-colors">
+              Policy assistant
+            </Link>
             {canCreateCase && (
               <Link href="/aicte/cases/new"
                 className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors">

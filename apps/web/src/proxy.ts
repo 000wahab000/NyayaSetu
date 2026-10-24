@@ -8,7 +8,7 @@ const ROLE_PREFIX: Record<string, Role[]> = {
   "/aicte": ["pgrc_triage_officer", "bureau_officer", "regional_officer", "bureau_head", "competent_authority", "ombudsperson", "auditor", "system_admin"],
 };
 // /api/notifications/deadlines is called by a cron, not a session; the route checks x-cron-secret itself.
-const OPEN = ["/auth", "/api/auth", "/api/notifications/deadlines", "/_next", "/favicon.ico", "/manifest.webmanifest", "/nyayasetu.svg"];
+const OPEN = ["/auth", "/api/auth", "/api/notifications/deadlines", "/api/reports/run-scheduled", "/_next", "/favicon.ico", "/manifest.webmanifest", "/nyayasetu.svg"];
 
 export async function proxy(request: NextRequest) {
   const path = request.nextUrl.pathname;
