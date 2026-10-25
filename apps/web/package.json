@@ -13,7 +13,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "seed": "node --env-file=.env.local src/scripts/seed.mjs",
-    "demo:reset": "node --env-file=.env.local src/scripts/demo-reset.mjs"
+    "demo:reset": "node --env-file=.env.local src/scripts/demo-reset.mjs",
+    "demo:code": "node --env-file=.env.local src/scripts/demo-login-code.mjs"
   },
   "dependencies": {
     "@huggingface/transformers": "^4.3.1",

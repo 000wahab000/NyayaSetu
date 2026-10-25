@@ -42,10 +42,12 @@ npm run db:push
 npm run seed
 cd apps/web
 node --env-file=.env.local src/scripts/backfill-embeddings.mjs
-npx tsx --env-file=.env.local src/scripts/ingest-policy.mjs
+npx tsx --conditions=react-server --env-file=.env.local src/scripts/ingest-policy.mjs ../../docs/policy-corpus
 cd ../..
 ```
-Demo accounts sign in with email OTP (no passwords). Officer and college roles must enrol TOTP on first login.
+Demo accounts sign in with email OTP (no passwords). Their `@nyayasetu.test` addresses cannot receive mail, so get a login code locally:
+`npm run demo:code -- student.demo@nyayasetu.test`
+Officer and college roles must enrol TOTP on first login.
 Reset demo data at any time: `npm run demo:reset`.
 
 ## 5. Run

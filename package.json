@@ -12,6 +12,7 @@
     "audit": "npm audit --omit=dev",
     "seed": "npm run seed --workspace @nyayasetu/web",
     "demo:reset": "npm run demo:reset --workspace @nyayasetu/web",
+    "demo:code": "npm run demo:code --workspace @nyayasetu/web --",
     "db:push": "supabase db push",
     "db:test": "supabase test db"
   },
