@@ -11,7 +11,7 @@ export default function VerifyForm({ email, initialCode = "" }: { email: string;
     window.location.href = result.redirectTo;
   }
   return <section className="card"><div className="brand">NyayaSetu · Sign in</div><h1>Enter your email code</h1><p className="muted">Code sent to {email || "your registered email"}.</p>
-    {initialCode && <p className="success" style={{ background: "#e6f4ea", color: "#137333", padding: "0.5rem 0.75rem", borderRadius: "6px", fontSize: "0.875rem", marginBottom: "1rem" }}>✓ Generated verification code: <strong>{initialCode}</strong></p>}
+    {initialCode && <p className="success" style={{ background: "#e6f4ea", color: "#137333", padding: "0.5rem 0.75rem", borderRadius: "6px", fontSize: "0.875rem", marginBottom: "1rem" }}>Testing mode: demo code filled in automatically (<strong>{initialCode}</strong>).</p>}
     <form onSubmit={submit}><label htmlFor="token">One-time code</label><input id="token" inputMode="numeric" autoComplete="one-time-code" minLength={6} maxLength={10} required value={token} onChange={(e) => setToken(e.target.value.replace(/\s/g, ""))} /><button disabled={busy}>{busy ? "Checking…" : "Verify and continue"}</button></form>
     {error && <p role="alert" className="error">{error}</p>}
   </section>;

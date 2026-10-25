@@ -20,11 +20,12 @@ export default function LoginForm() {
   }
 
   const demoAccounts = [
-    { label: "Admin", email: "krishnasahoo11156@gmail.com" },
-    { label: "Student", email: "student@nyayasetu.demo" },
-    { label: "Faculty", email: "faculty@nyayasetu.demo" },
-    { label: "College", email: "college@nyayasetu.demo" },
-    { label: "AICTE PGRC", email: "pgrc@nyayasetu.demo" },
+    { label: "Student", email: "student.demo@nyayasetu.test" },
+    { label: "Faculty", email: "faculty.demo@nyayasetu.test" },
+    { label: "College", email: "college.demo@nyayasetu.test" },
+    { label: "AICTE PGRC", email: "pgrc.demo@nyayasetu.test" },
+    { label: "RB Officer", email: "rb.demo@nyayasetu.test" },
+    { label: "Senior Mgmt", email: "mgmt.demo@nyayasetu.test" },
   ];
 
   return <section className="card"><div className="brand">NyayaSetu · CaseBridge AI</div><h1>Sign in securely</h1><p className="muted">Enter your registered email or choose a demo persona below to sign in instantly.</p>
