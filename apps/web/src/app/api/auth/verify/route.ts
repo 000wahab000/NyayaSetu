@@ -7,6 +7,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { getAppSession } from "@/lib/auth/session";
 import { destinationFor } from "@/lib/auth/redirect";
 import { auditLog } from "@/lib/audit";
+import { DEMO_DOMAIN } from "@/lib/auth/demo";
+import { autoCompleteMfa } from "@/lib/auth/demo-mfa";
 
 const Body = z.object({ email: z.string().email().max(254), token: z.string().min(6).max(10).regex(/^\d+$/) }).strict();
 export async function POST(request: Request) {
@@ -17,6 +19,10 @@ export async function POST(request: Request) {
   if (error || !data.user) {
     await auditLog({ action: "auth.login_failed", resource_type: "auth", reason: error?.code ?? "invalid_otp" });
     return NextResponse.json({ error: "The code is invalid or expired." }, { status: 401 });
+  }
+  // Testing only: demo accounts skip the authenticator prompt (never in production).
+  if (process.env.NODE_ENV !== "production" && parsed.data.email.toLowerCase().endsWith(DEMO_DOMAIN)) {
+    await autoCompleteMfa(supabase, createAdminClient(), data.user.id);
   }
   const session = await getAppSession(data.user);
   if (!session) {
