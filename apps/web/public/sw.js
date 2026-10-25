@@ -1,5 +1,6 @@
-// v2 bumps the cache name so the activate step purges HTML cached by v1.
-const CACHE = "nyayasetu-pwa-v2";
+// v3 bumps the cache name so the activate step purges everything cached by v1/v2, including /_next assets
+// that went stale after code changes. App code under /_next is never cached here any more.
+const CACHE = "nyayasetu-pwa-v3";
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(["/nyayasetu.svg"])));
   self.skipWaiting();
@@ -14,7 +15,7 @@ self.addEventListener("fetch", (event) => {
   if (request.method !== "GET" || url.origin !== self.location.origin) return;
   // Only static assets are cached. Authenticated HTML navigations are never stored.
   if (request.mode === "navigate") return;
-  if (url.pathname.startsWith("/_next/static/") || url.pathname.startsWith("/icons/") || url.pathname === "/manifest.webmanifest" || url.pathname === "/nyayasetu.svg") {
+  if (url.pathname.startsWith("/icons/") || url.pathname === "/nyayasetu.svg") {
     event.respondWith((async () => {
       const cached = await caches.match(request);
       if (cached) return cached;

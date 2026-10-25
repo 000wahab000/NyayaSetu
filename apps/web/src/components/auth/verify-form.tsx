@@ -4,7 +4,9 @@ import { useState } from "react";
 export default function VerifyForm({ email, initialCode = "" }: { email: string; initialCode?: string }) {
   const [token, setToken] = useState(initialCode); const [busy, setBusy] = useState(false); const [error, setError] = useState("");
   async function submit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault(); setBusy(true); setError("");
+    event.preventDefault(); setError("");
+    if (!email) return setError("We lost track of your email. Go back to the login page and choose your account again.");
+    setBusy(true);
     const response = await fetch("/api/auth/verify", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email, token }) });
     const result = await response.json(); setBusy(false);
     if (!response.ok) return setError(result.error ?? "Could not verify code.");
